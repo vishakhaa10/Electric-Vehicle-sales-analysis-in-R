@@ -1,0 +1,492 @@
+---
+title: "edaproj"
+author: "20MIA1126"
+date: "2024-04-22"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r}
+library(readxl)
+data <- read_excel("C:/Users/SRIDHAR/Desktop/WINTER SEM 23-24/EDA/project/yearwise-sales-dataof maker for past 5 years (1).xlsx")
+```
+
+```{r}
+head(data)
+```
+```{r}
+sum(is.na(data))
+
+```
+```{r}
+clean_data <- na.omit(data)
+head(clean_data)
+```
+
+# EDA
+```{r}
+library(tidyverse)
+library(ggplot2)
+```
+
+```{r}
+summary(clean_data)
+```
+
+```{r}
+colnames(clean_data)
+```
+
+
+```{r}
+
+colnames(clean_data) <- c("S_No", "Maker", "2023", "2022", "2021", "2020", "2019", "TOTAL")
+
+head(clean_data,30)
+
+
+```
+```{r}
+colnames(clean_data)
+```
+
+
+# Plot the data
+
+```{r}
+# Load the necessary libraries
+library(shiny)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+```
+
+```{r}
+view(clean_data)
+
+```
+
+
+
+
+```{r}
+# Load the necessary package
+#library(rpart)
+
+# Assuming your data frame is named 'df' and is properly formatted
+
+# Build a decision tree model
+#tree_model <- rpart(TOTAL ~ `2023` + `2022` + `2021` + `2020` + `2019` + MAKER, data = data)
+
+# Print the summary of the tree model
+#printcp(tree_model)
+
+# Plot the decision tree
+#plot(tree_model)
+#text(tree_model)
+
+
+```
+
+
+```{r}
+#is.na(data)
+```
+
+```{r}
+# Load necessary libraries
+library(randomForest)
+library(rpart)
+library(rpart.plot)
+library(ggplot2)
+# Convert 'TOTAL' from character to numeric after removing commas
+data$TOTAL <- as.numeric(gsub(",", "", data$TOTAL))
+
+# Check for NAs which might have been introduced by coercion
+sum(is.na(data$TOTAL))
+
+# 'TOTAL' is likely our target variable, and 'S No' is just an identifier
+model_data <- data[, -c(1, ncol(data))]
+
+# Set up the target variable
+target <- data$TOTAL
+
+# Build the Random Forest model
+rf_model <- randomForest(x = model_data, y = target, ntree = 100)
+
+# Plot variable importance
+varImpPlot(rf_model)
+
+# Build the Decision Tree model
+dt_model <- rpart(TOTAL ~ ., data = data[, -1]) # exclude 'S No' for modeling
+
+# Plot the decision tree
+rpart.plot(dt_model)
+
+# Generate predictions from both models (example for the training data itself)
+rf_predictions <- predict(rf_model, model_data)
+dt_predictions <- predict(dt_model, model_data)
+
+# Plot predictions vs. actual values
+# For Random Forest
+rf_pred_actual <- data.frame(Actual = target, Predicted = rf_predictions)
+ggplot(rf_pred_actual, aes(x = Actual, y = Predicted)) +
+  geom_point() +
+  geom_smooth(method = "lm", color = "blue") +
+  ggtitle("Random Forest: Actual vs Predicted")
+
+# For Decision Tree
+dt_pred_actual <- data.frame(Actual = target, Predicted = dt_predictions)
+ggplot(dt_pred_actual, aes(x = Actual, y = Predicted)) +
+  geom_point() +
+  geom_smooth(method = "lm", color = "red") +
+  ggtitle("Decision Tree: Actual vs Predicted")
+
+```
+
+
+```{r}
+# Load necessary library
+library(Metrics)
+
+
+data$TOTAL <- as.numeric(gsub(",", "", data$TOTAL))
+data <- na.omit(data)  # Remove rows with NAs, especially in the 'TOTAL' column
+
+# Calculate MAE and RMSE for Random Forest predictions
+rf_mae <- mae(data$TOTAL, rf_predictions)
+rf_rmse <- rmse(data$TOTAL, rf_predictions)
+
+# Calculate MAE and RMSE for Decision Tree predictions
+dt_mae <- mae(data$TOTAL, dt_predictions)
+dt_rmse <- rmse(data$TOTAL, dt_predictions)
+
+# Print the metrics
+cat("Metrics for Random Forest Model:\n")
+cat("MAE:", rf_mae, "\n")
+cat("RMSE:", rf_rmse, "\n\n")
+library(caret)
+
+# R-squared for Random Forest
+rf_r2 <- R2(rf_predictions, data$TOTAL)
+cat("R-squared for Random Forest:", rf_r2, "\n")
+
+# R-squared for Decision Tree
+dt_r2 <- R2(dt_predictions, data$TOTAL)
+cat("R-squared for Decision Tree:", dt_r2, "\n")
+
+```
+
+```{r}
+# Set 2023 values to be the same as those for 2022 if no change is expected
+predict_data$`2023` <- predict_data$`2022`
+
+# Ensure no NAs remain in the predictor data
+predict_data <- na.omit(predict_data)
+
+# Predict for the next year using the Random Forest model
+next_year_predictions <- predict(rf_model, newdata = predict_data)
+
+# Output the predictions
+next_year_predictions
+```
+
+```{r}
+
+predictions_df <- data.frame(Maker = data$MAKER, 
+                             Predicted_TOTAL = next_year_predictions)
+
+predictions_df$Predicted_TOTAL <- round(predictions_df$Predicted_TOTAL, 2)
+
+# Print the new data frame
+print(predictions_df)
+```
+```{r}
+
+
+# Load the libraries
+library(forecast)
+library(prophet)
+library(readr)
+
+```
+```{r}
+# Read the CSV file
+library(readxl)
+sales_data <- read_excel("C:/Users/SRIDHAR/Desktop/WINTER SEM 23-24/EDA/project/yearwise-sales-dataof maker for past 5 years (1).xlsx")
+
+# Check the data
+yearly_sales <- sales_data[,2:6]  # Adjust the column indices if necessary
+
+# Aggregate the sales data by year
+total_sales_by_year <- colSums(yearly_sales, na.rm = TRUE)
+
+# Convert the aggregated data to a time series object
+ts_data <- ts(total_sales_by_year, start = 2019, frequency = 1)
+
+# Fit an ARIMA model
+fit_arima <- auto.arima(ts_data)
+summary(fit_arima)
+
+# Forecast future sales
+future_sales_arima <- forecast(fit_arima, h = 2)  # Forecast for 2 additional years
+plot(future_sales_arima)
+
+```
+```{r}
+
+```
+
+```{r}
+
+
+# Split the data into training and test sets
+training_data <- ts_data[1:(length(ts_data)-1)]
+test_data <- ts_data[(length(ts_data)-1):length(ts_data)]
+
+# Fit an ARIMA model on the training set
+fit_arima <- auto.arima(training_data)
+summary(fit_arima)
+
+# Forecast the next period (which is our test set)
+forecasted_values <- forecast(fit_arima, h = 1)
+
+
+
+
+# Print the accuracy metrics
+print(forecasted_values)
+
+```
+```{r}
+install.packages("prophet")
+```
+
+
+```{r}
+# Load the necessary library
+library(forecast)
+
+
+
+# Fit an exponential smoothing state space model to the time series data
+ets_model <- ets(ts_data)
+
+# Forecast the next periods
+ets_forecast <- forecast(ets_model, h = 2)  # h is the number of periods to forecast
+
+# Plot the forecast
+plot(ets_forecast)
+
+# Print the forecasted values
+print(ets_forecast)
+
+
+
+
+```
+
+
+
+
+
+
+```{r}
+
+library(xgboost)
+library(readr)
+library(dplyr)
+library(readxl)
+
+# Load data
+data <- read_excel("C:/Users/SRIDHAR/Desktop/WINTER SEM 23-24/EDA/project/yearwise-sales-dataof maker for past 5 years (1).xlsx")
+
+data <- data %>%
+  mutate(across(where(is.character), as.numeric))  
+
+# Split the data into predictors (X) and target (y)
+X <- subset(data, select = -TOTAL)
+y <- data$TOTAL
+
+# Build the XGBoost model
+set.seed(42)
+xgb_model <- xgboost(data = as.matrix(X), label = y, nrounds = 1000, max_depth = 4, eta = 0.01, objective = "reg:squarederror", nfold = 5)
+
+# Check the model has been created
+
+# Print the summary of the xgboost model
+print(xgb_model)
+
+
+```
+```{r}
+# Adjust model parameters for regularization
+set.seed(42)
+xgb_model <- xgboost(data = as.matrix(X), label = y, nrounds = 500, max_depth = 1, eta = 0.1, lambda = 3, alpha = 1, objective = "reg:squarederror", nfold = 6)
+
+# Get predicted values on the training data
+predicted <- predict(xgb_model, as.matrix(X))
+
+# Make predictions
+predictions <- predicted
+
+# Visualize actual vs predicted
+plot(y, predictions, xlab = "Actual", ylab = "Predicted", main = "Actual vs Predicted")
+abline(0, 1, col = "red")  # Add a 45-degree line for reference
+
+# Calculate and print the model performance metrics
+accuracy <- sqrt(mean((predictions - y)^2))  # Root Mean Squared Error
+cat("Root Mean Squared Error:", accuracy, "\n")
+
+
+importance_matrix <- xgb.importance(colnames(X), model = xgb_model)
+xgb.plot.importance(importance_matrix)
+
+# Calculate Mean Squared Error (MSE)
+mse <- mean((predicted - y)^2)
+
+# Calculate R-squared
+SS_Residual <- sum((y - predicted)^2)
+SS_Total <- sum((y - mean(y))^2)
+rsquared <- 1 - (SS_Residual / SS_Total)
+
+# Print MSE and R-squared
+cat("Mean Squared Error (MSE):", mse, "\n")
+cat("R-squared:", rsquared, "\n")
+
+
+```
+
+```{r}
+# Make sure all libraries are loaded
+library(randomForest)
+library(readr)
+library(dplyr)
+library(readxl)
+
+# Load data
+data <- read_excel("C:/Users/SRIDHAR/Desktop/WINTER SEM 23-24/EDA/project/yearwise-sales-dataof maker for past 5 years (1).xlsx")
+
+ 
+
+# Split the data into predictors (X) and target (y)
+X <- subset(data, select = -TOTAL)
+y <- data$TOTAL
+
+# Build the Random Forest model
+# Build the Random Forest model with adjusted hyperparameters
+set.seed(42)
+rf_model <- randomForest(x = X, y = y, ntree = 1000, mtry = 3, max_depth = 20)
+
+# Print the model
+print(rf_model)
+
+# Get predicted values on the training data
+predicted <- predict(rf_model, X)
+
+# Calculate Mean Squared Error (MSE)
+mse <- mean((predicted - y)^2)
+
+# Calculate R-squared
+rsquared <- cor(predicted, y)^2
+
+# Print MSE and R-squared
+cat("Mean Squared Error (MSE):", mse, "\n")
+cat("R-squared:", rsquared, "\n")
+
+
+```
+
+
+
+
+
+
+
+
+```{r}
+
+
+# Plot the data
+
+
+# Load the necessary libraries
+library(shiny)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+
+
+
+
+# Define the user interface
+ui <- fluidPage(
+  titlePanel("Maker Sales Dashboard"),
+  sidebarLayout(
+    sidebarPanel(
+      selectInput("maker", "Choose a Maker:", choices = unique(clean_data$Maker)),
+      selectInput("year", "Choose a Year:", choices = c("2019", "2020", "2021", "2022", "2023"))
+    ),
+    mainPanel(
+      textOutput("salesInfo"),
+      plotOutput("salesBarPlot"),
+      plotOutput("salesPieChart")
+    )
+  )
+)
+
+# Define the server logic
+server <- function(input, output) {
+  output$salesInfo <- renderText({
+    selected_maker <- input$maker
+    selected_year <- input$year
+    sales_data <- clean_data %>%
+      filter(Maker == selected_maker) %>%
+      select(selected_year, TOTAL) %>%
+      drop_na()
+    
+    paste("Total sales for", selected_maker, "in", selected_year, "is:", sales_data[[1]], "\n",
+          "Cumulative sales from 2019 to", selected_year, "is:", sales_data[[2]])
+  })
+  
+  output$salesBarPlot <- renderPlot({
+    selected_maker <- input$maker
+    sales_data <- clean_data %>%
+      filter(Maker == selected_maker) %>%
+      select(`2019`, `2020`, `2021`, `2022`, `2023`) %>%
+      pivot_longer(cols = c(`2019`, `2020`, `2021`, `2022`, `2023`), names_to = "Year", values_to = "Sales")
+    
+    ggplot(sales_data, aes(x = Year, y = Sales, fill = Year)) +
+      geom_bar(stat = "identity") +
+      labs(title = paste("Total Sales for", selected_maker, "by Year"), x = "Year", y = "Sales") +
+      theme_minimal()
+  })
+  
+  output$salesPieChart <- renderPlot({
+    selected_maker <- input$maker
+    sales_data <- clean_data %>%
+      filter(Maker == selected_maker) %>%
+      select(`2019`, `2020`, `2021`, `2022`, `2023`) %>%
+      pivot_longer(cols = c(`2019`, `2020`, `2021`, `2022`, `2023`), names_to = "Year", values_to = "Sales")
+    
+    ggplot(sales_data, aes(x = "", y = Sales, fill = Year)) +
+      geom_bar(width = 1, stat = "identity") +
+      coord_polar("y", start = 0) +
+      theme_void() +
+      labs(fill = "Year") +
+      theme(legend.position = "bottom") +
+      labs(title = paste("Sales Distribution for", selected_maker))
+  })
+}
+
+# Run the application
+shinyApp(ui = ui, server = server)
+
+
+
+```
